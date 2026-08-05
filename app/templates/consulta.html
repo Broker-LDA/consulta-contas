@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Dados Bancários</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <style>
+        :root {
+            --bg: #f1f3f6;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --text: #14161a;
+            --text-secondary: #5f6572;
+            --border: #e2e5eb;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-soft: #eef2ff;
+            --erro-bg: #fef2f2;
+            --erro-border: #fecaca;
+            --erro-text: #991b1b;
+            --sombra: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06);
+            --sombra-hover: 0 4px 12px rgba(0,0,0,0.08), 0 16px 32px rgba(0,0,0,0.08);
+            --raio: 14px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-tema="claro"]) {
+                --bg: #101114;
+                --card-bg: rgba(26, 28, 32, 0.7);
+                --text: #f2f3f5;
+                --text-secondary: #9a9fab;
+                --border: #2c2f36;
+                --primary: #4f83f7;
+                --primary-hover: #6f9bf9;
+                --primary-soft: #1c2333;
+                --erro-bg: #2a1616;
+                --erro-border: #5c2323;
+                --erro-text: #fca5a5;
+                --sombra: 0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.25);
+                --sombra-hover: 0 4px 16px rgba(0,0,0,0.4), 0 20px 40px rgba(0,0,0,0.3);
+            }
+        }
+
+        [data-tema="escuro"] {
+            --bg: #101114;
+            --card-bg: rgba(26, 28, 32, 0.7);
+            --text: #f2f3f5;
+            --text-secondary: #9a9fab;
+            --border: #2c2f36;
+            --primary: #4f83f7;
+            --primary-hover: #6f9bf9;
+            --primary-soft: #1c2333;
+            --erro-bg: #2a1616;
+            --erro-border: #5c2323;
+            --erro-text: #fca5a5;
+            --sombra: 0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.25);
+            --sombra-hover: 0 4px 16px rgba(0,0,0,0.4), 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        * { box-sizing: border-box; }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; animation: none !important; }
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: "Segoe UI", -apple-system, Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0 20px 60px;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Logo de fundo, ampliada e sutil, atrás de tudo */
+        .logo-fundo {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(70vw, 640px);
+            opacity: 0.12;
+            filter: grayscale(1);
+            z-index: -1;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        [data-tema="escuro"] .logo-fundo {
+            opacity: 0.07;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-tema="claro"]) .logo-fundo {
+                opacity: 0.07;
+            }
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -48px;
+            left: 12px;
+            background: var(--primary);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            z-index: 100;
+            transition: top 0.2s ease;
+        }
+        .skip-link:focus { top: 12px; }
+
+        header {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 24px 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .marca { display: flex; align-items: center; gap: 12px; }
+        .logo { height: 46px; width: auto; }
+        .marca-texto { display: flex; flex-direction: column; font-weight: 600; font-size: 1.05rem; }
+        .marca-texto small { font-weight: 400; font-size: 0.75rem; color: var(--text-secondary); }
+
+        .botao-tema {
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--sombra);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .botao-tema:hover { transform: translateY(-2px) scale(1.05); box-shadow: var(--sombra-hover); }
+        .botao-tema svg { width: 20px; height: 20px; stroke: var(--text); position: absolute; transition: opacity 0.25s ease, transform 0.25s ease; }
+        .icone-sol { opacity: 0; transform: rotate(-90deg) scale(0.5); }
+        .icone-lua { opacity: 1; transform: rotate(0) scale(1); }
+        [data-tema="escuro"] .icone-sol { opacity: 1; transform: rotate(0) scale(1); }
+        [data-tema="escuro"] .icone-lua { opacity: 0; transform: rotate(90deg) scale(0.5); }
+
+        main { max-width: 860px; margin: 0 auto; }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--raio);
+            padding: 32px;
+            box-shadow: var(--sombra);
+            animation: aparecer 0.4s ease;
+        }
+
+        h1 { margin: 0 0 8px; font-size: 1.6rem; }
+        .subtitulo { color: var(--text-secondary); margin: 0 0 24px; }
+
+        .campo-busca { display: flex; gap: 10px; margin-bottom: 6px; }
+        .campo-busca input {
+            flex: 1;
+            padding: 13px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 1rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .campo-busca input:focus-visible {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-soft);
+        }
+
+        .acao {
+            padding: 13px 22px;
+            border-radius: 10px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .acao:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+        }
+        .acao:active:not(:disabled) { transform: translateY(0); }
+        .acao:disabled { opacity: 0.4; cursor: not-allowed; }
+        .acao:focus-visible, .botao-tema:focus-visible, a:focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        .status-busca { color: var(--text-secondary); font-size: 0.85rem; min-height: 1.2em; margin: 4px 0 20px; }
+
+        @keyframes aparecer {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #resultado-container { animation: aparecer 0.35s ease; }
+
+        .tabela-wrapper { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: var(--primary-soft); }
+        th { text-align: left; padding: 12px 16px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+        td { padding: 14px 16px; border-top: 1px solid var(--border); }
+        tbody tr { transition: background-color 0.15s ease; }
+        tbody tr:hover { background-color: var(--primary-soft); }
+
+        .col-sold { width: 20%; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+        .col-nome { width: 50%; font-weight: 500; }
+        .col-dados { width: 30%; }
+
+        .erro {
+            padding: 16px;
+            background: var(--erro-bg);
+            border: 1px solid var(--erro-border);
+            color: var(--erro-text);
+            border-radius: 10px;
+            animation: aparecer 0.3s ease;
+        }
+
+        .paginacao {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 20px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        .paginacao .acao { padding: 9px 18px; font-size: 0.9rem; }
+
+        footer {
+            max-width: 860px;
+            margin: 40px auto 0;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            opacity: 0.75;
+            transition: opacity 0.2s ease, color 0.2s ease;
+        }
+        footer a:hover { opacity: 1; color: var(--primary); }
+        .marca-registrada { opacity: 0.55; }
+
+        .sr-only {
+            position: absolute; width: 1px; height: 1px;
+            padding: 0; margin: -1px; overflow: hidden;
+            clip: rect(0,0,0,0); border: 0;
+        }
+
+       @media (max-width: 768px) {
+            .marca-texto { display: none; }
+            .card { padding: 20px; border-radius: 16px; }
+            .campo-busca { flex-direction: column; }
+            footer a[href="/tela/upload"] { display: none; }
+
+            .tabela-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                border: 1px solid var(--border);
+                border-radius: 12px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.8rem;
+                white-space: nowrap;
+            }
+
+            th, td {
+                padding: 8px 10px;
+            }
+
+            thead th {
+                background: var(--primary-soft);
+                color: var(--text);
+                font-weight: 600;
+                text-align: left;
+                padding: 10px 12px;
+                position: sticky;
+                top: 0;
+            }
+
+            tbody td {
+                padding: 10px 12px;
+                border-top: 1px solid var(--border);
+                text-align: left;
+            }
+
+            tbody tr:nth-child(even) {
+                background: rgba(0, 0, 0, 0.02);
+            }
+
+            .col-sold {
+                white-space: nowrap;
+            }
+
+            .col-nome {
+                white-space: normal;
+                max-width: 130px;
+                line-height: 1.3;
+            }
+            .col-dados {
+                white-space: nowrap;
+                font-size: 0.75rem;
+            }
+        }
+        
+
+        .layout-principal {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .layout-principal {
+                grid-template-columns: 1fr;
+            }
+
+            .card-dashboard {
+                order: 2;
+            }
+
+            .card-consulta {
+                order: 1;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .card-dashboard { position: static; }
+        }
+
+        .card-dashboard h2 {
+            font-size: 1rem;
+            margin: 0 0 16px;
+        }
+
+        .grafico-container {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 18px;
+        }
+
+        .grafico-container svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .grafico-container circle {
+            transition: stroke-dasharray 0.6s ease;
+        }
+
+        .grafico-total {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .grafico-total span {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .grafico-total small {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .legenda-grafico {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .legenda-grafico li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+
+        .legenda-cor {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .legenda-nome {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+        }
+
+        .legenda-valor {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* Desktop: dashboard sempre visível, sem comportamento de collapse */
+        .card-dashboard summary {
+            cursor: default;
+            font-size: 1rem;
+            font-weight: 600;
+            list-style: none;
+        }
+        .card-dashboard summary::-webkit-details-marker {
+            display: none;
+        }
+        .card-dashboard summary::marker {
+            content: "";
+        }
+        .card-dashboard .conteudo-dashboard {
+            margin-top: 16px;
+        }
+
+        /* Mobile: dashboard recolhível, iniciando fechado */
+        @media (max-width: 900px) {
+            .card-dashboard {
+                order: -1;
+                padding: 16px 20px;
+            }
+
+            .card-dashboard summary {
+                cursor: pointer;
+                font-size: 0.95rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                list-style: none;
+            }
+
+            .card-dashboard summary::-webkit-details-marker {
+                display: none;
+            }
+
+            .card-dashboard summary::after {
+                content: "▾";
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                transition: transform 0.2s ease;
+            }
+
+            .card-dashboard[open] summary::after {
+                transform: rotate(180deg);
+            }
+
+            .card-dashboard .conteudo-dashboard {
+                margin-top: 16px;
+                animation: aparecer 0.25s ease;
+            }
+        }
+    </style>
+</head>
+<body>
+    <img src="/static/logo.png" alt="" class="logo-fundo" aria-hidden="true">
+
+    <a href="#conteudo-principal" class="skip-link">Pular para o conteúdo principal</a>
+
+    <header>
+        <div class="marca">
+            <img src="/static/logo.png" alt="Logo da empresa" class="logo">
+            <span class="marca-texto">Consulta de Contas<small>Dados bancários por Sold</small></span>
+        </div>
+        <button
+            class="botao-tema"
+            id="botao-tema"
+            onclick="alternarTema()"
+            aria-pressed="false"
+            aria-label="Ativar tema escuro"
+        >
+            <svg class="icone-lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <svg class="icone-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="5"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+        </button>
+    </header>
+
+    <main id="conteudo-principal" class="layout-principal">
+        <section class="card card-consulta">
+            <h1>Consulta de Dados Bancários</h1>
+            <p class="subtitulo">Digite o Sold ou o nome do cliente para localizar as informações atualizadas.</p>
+
+            <div class="campo-busca">
+                <label for="busca" class="sr-only">Buscar por Sold ou Nome</label>
+                <input type="text" id="busca" placeholder="Buscar por Sold ou Nome">
+                <button class="acao" onclick="buscarPagina(1)">Buscar</button>
+            </div>
+
+            <p class="status-busca" id="status-busca" aria-live="polite"></p>
+
+            <div id="resultado-container"></div>
+        </section>
+
+        <aside class="card card-dashboard" aria-labelledby="titulo-dashboard">
+            <details id="detalhes-dashboard">
+                <summary id="titulo-dashboard">Distribuição da carteira</summary>
+                <div class="conteudo-dashboard">
+                    <div id="grafico-container" class="grafico-container">
+                        <svg id="grafico-donut" viewBox="0 0 120 120" role="img" aria-label="Gráfico de distribuição de clientes por tipo de dados bancários"></svg>
+                        <div class="grafico-total">
+                            <span id="grafico-total-numero">0</span>
+                            <small>clientes</small>
+                        </div>
+                    </div>
+                    <ul id="legenda-grafico" class="legenda-grafico"></ul>
+                </div>
+            </details>
+        </aside>
+    </main>
+
+    <footer>
+        <a href="/tela/upload">Área administrativa</a>
+        <span class="marca-registrada">Desenvolvido pelo setor de Tecnologia da Informação — Broker LDA © 2026</span>
+    </footer>
+
+    <script>
+        const POR_PAGINA = 5;
+        const botaoTema = document.getElementById('botao-tema');
+
+        function alternarTema() {
+            const atual = document.documentElement.getAttribute('data-tema');
+            const novo = atual === 'escuro' ? 'claro' : 'escuro';
+            document.documentElement.setAttribute('data-tema', novo);
+            localStorage.setItem('tema', novo);
+            atualizarBotaoTema(novo);
+        }
+
+        function atualizarBotaoTema(tema) {
+            const escuro = tema === 'escuro';
+            botaoTema.setAttribute('aria-pressed', String(escuro));
+            botaoTema.setAttribute('aria-label', escuro ? 'Ativar tema claro' : 'Ativar tema escuro');
+        }
+
+        const temaSalvo = localStorage.getItem('tema');
+        if (temaSalvo) {
+            document.documentElement.setAttribute('data-tema', temaSalvo);
+            atualizarBotaoTema(temaSalvo);
+        }
+
+        async function buscarPagina(pagina) {
+            const busca = document.getElementById('busca').value.trim();
+            const container = document.getElementById('resultado-container');
+            const status = document.getElementById('status-busca');
+
+            try {
+                const params = new URLSearchParams({ pagina: pagina, por_pagina: POR_PAGINA });
+                if (busca) params.append('busca', busca);
+
+                const resposta = await fetch(`/consulta?${params}`);
+                const dados = await resposta.json();
+
+                container.classList.remove('reanimar');
+                void container.offsetWidth; // força reflow para reiniciar a animação
+                container.classList.add('reanimar');
+
+                if (!dados.resultados.length) {
+                    container.innerHTML = '<div class="erro">Nenhum cliente encontrado.</div>';
+                    status.textContent = 'Nenhum resultado encontrado.';
+                    return;
+                }
+
+                const linhas = dados.resultados.map(c => `
+                    <tr>
+                        <td class="col-sold" data-label="Sold">${c.sold}</td>
+                        <td class="col-nome" data-label="Nome">${c.nome_cliente}</td>
+                        <td class="col-dados" data-label="Dados Bancários">${c.dados_bancarios}</td>
+                    </tr>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="tabela-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Sold</th>
+                                    <th scope="col">Nome</th>
+                                    <th scope="col">Dados Bancários</th>
+                                </tr>
+                            </thead>
+                            <tbody>${linhas}</tbody>
+                        </table>
+                    </div>
+                    <div class="paginacao">
+                        <button class="acao" ${pagina <= 1 ? 'disabled' : ''} onclick="buscarPagina(${pagina - 1})">Anterior</button>
+                        <span>Página ${dados.pagina_atual} de ${dados.total_paginas}</span>
+                        <button class="acao" ${pagina >= dados.total_paginas ? 'disabled' : ''} onclick="buscarPagina(${pagina + 1})">Próxima</button>
+                    </div>
+                `;
+
+                status.textContent = `${dados.total_registros} resultado(s) encontrado(s). Página ${dados.pagina_atual} de ${dados.total_paginas}.`;
+            } catch (erro) {
+                container.innerHTML = '<div class="erro">Erro ao consultar. Tente novamente.</div>';
+                status.textContent = 'Ocorreu um erro na busca.';
+            }
+        }
+
+        document.getElementById('busca').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') buscarPagina(1);
+        });
+
+        buscarPagina(1);
+
+        const CORES_CATEGORIAS = {
+            "Conta Bancária": "#2563eb",
+            "Pagador": "#f59e0b",
+            "Conta e Pagador": "#16a34a",
+            "Não Possui": "#94a3b8"
+        };
+
+        async function carregarDashboard() {
+            try {
+                const resposta = await fetch('/consulta/estatisticas/resumo');
+                const dados = await resposta.json();
+
+                document.getElementById('grafico-total-numero').textContent = dados.total_geral;
+
+                const raio = 50;
+                const circunferencia = 2 * Math.PI * raio;
+                let acumulado = 0;
+
+                const svg = document.getElementById('grafico-donut');
+                svg.innerHTML = '';
+
+                Object.entries(dados.categorias).forEach(([nome, valor]) => {
+                    const proporcao = dados.total_geral > 0 ? valor / dados.total_geral : 0;
+                    const tamanhoTraco = proporcao * circunferencia;
+
+                    const circulo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circulo.setAttribute('cx', '60');
+                    circulo.setAttribute('cy', '60');
+                    circulo.setAttribute('r', raio);
+                    circulo.setAttribute('fill', 'none');
+                    circulo.setAttribute('stroke', CORES_CATEGORIAS[nome] || '#ccc');
+                    circulo.setAttribute('stroke-width', '14');
+                    circulo.setAttribute('stroke-dasharray', `${tamanhoTraco} ${circunferencia - tamanhoTraco}`);
+                    circulo.setAttribute('stroke-dashoffset', -acumulado);
+
+                    svg.appendChild(circulo);
+                    acumulado += tamanhoTraco;
+                });
+
+                const legenda = document.getElementById('legenda-grafico');
+                legenda.innerHTML = Object.entries(dados.categorias).map(([nome, valor]) => `
+                    <li>
+                        <span class="legenda-nome">
+                            <span class="legenda-cor" style="background:${CORES_CATEGORIAS[nome] || '#ccc'}"></span>
+                            ${nome}
+                        </span>
+                        <span class="legenda-valor">${valor}</span>
+                    </li>
+                `).join('');
+            } catch (erro) {
+                console.error('Erro ao carregar dashboard:', erro);
+            }
+        }
+
+        carregarDashboard();
+    </script>
+</body>
+</html>
