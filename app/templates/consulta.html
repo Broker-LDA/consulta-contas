@@ -482,6 +482,18 @@
                 margin-top: 16px;
                 animation: aparecer 0.25s ease;
             }
+
+            .acao-secundaria {
+                background: transparent;
+                color: var(--text-secondary);
+                border: 1px solid var(--border);
+            }
+            .acao-secundaria:hover:not(:disabled) {
+                background: var(--primary-soft);
+                color: var(--text);
+                transform: translateY(-2px);
+                box-shadow: none;
+            }
         }
     </style>
 </head>
@@ -521,6 +533,7 @@
                 <label for="busca" class="sr-only">Buscar por Sold ou Nome</label>
                 <input type="text" id="busca" placeholder="Buscar por Sold ou Nome">
                 <button class="acao" onclick="buscarPagina(1)">Buscar</button>
+                <button class="acao acao-secundaria" type="button" onclick="limparFiltro()">Limpar</button>
             </div>
 
             <p class="status-busca" id="status-busca" aria-live="polite"></p>
@@ -636,6 +649,14 @@
         });
 
         buscarPagina(1);
+
+        function limparFiltro() {
+            // Limpa o texto digitado no campo de busca
+            document.getElementById('busca').value = '';
+
+            // Recarrega a listagem completa, voltando para a página 1, sem filtro
+            buscarPagina(1);
+        }
 
         const CORES_CATEGORIAS = {
             "Conta Bancária": "#2563eb",
