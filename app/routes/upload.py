@@ -19,7 +19,8 @@ def upload_planilha(
     Recebe um arquivo XLSX, valida e realiza a importação/atualização
     da base de clientes. Requer o header X-Upload-Secret correto.
     """
-    if not arquivo.filename.endswith(".xlsx"):
+    extensao = os.path.splitext(arquivo.filename)[1].lower()
+    if extensao != ".xlsx":
         raise HTTPException(
             status_code=400,
             detail="Apenas arquivos .xlsx são aceitos."
