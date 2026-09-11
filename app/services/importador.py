@@ -2,29 +2,61 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from app.models import ClienteConta
 
+COLUNAS_CANONICAS = {
+    "sold": "Sold",
+    "nome": "Nome",
+    "dados bancários": "Dados Bancários",
+}
+
 COLUNAS_ESPERADAS = {"Sold", "Nome", "Dados Bancários"}
+
 VALORES_PERMITIDOS = {"Conta Bancária", "Pagador", "Conta e Pagador", "Não Possui"}
-MAPA_NORMALIZACAO = {valor.strip().lower(): valor for valor in VALORES_PERMITIDOS}
+
+# Traduz qualquer variação de texto (antiga ou nova) para o valor canônico
+MAPA_NORMALIZACAO = {
+    "conta bancária": "Conta Bancária",
+    "sim, conta bancária": "Conta Bancária",
+    "pagador": "Pagador",
+    "sim, pagador": "Pagador",
+    "conta e pagador": "Conta e Pagador",
+    "sim, conta e pagador": "Conta e Pagador",
+    "não possui": "Não Possui",
+}
+
 
 class ErroValidacaoPlanilha(Exception):
     """Exceção customizada para erros de validação da planilha."""
     pass
 
+
 def normalizar_dados_bancarios(valor: str) -> str | None:
     """
-    Recebe o valor bruto da planilha e retorna a versão padronizada
-    (exatamente como o banco espera), ou None se não corresponder
-    a nenhum valor permitido, mesmo após normalização.
+    Recebe o valor bruto da planilha (em qualquer formato aceito)
+    e retorna a categoria canônica usada internamente e no gráfico,
+    ou None se não corresponder a nenhum valor conhecido.
     """
     chave = str(valor).strip().lower()
     return MAPA_NORMALIZACAO.get(chave)
 
+
+def normalizar_colunas(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Renomeia as colunas do DataFrame para os nomes canônicos esperados,
+    tolerando variações de maiúsculas/minúsculas e espaços no cabeçalho.
+    """
+    mapa_renomeacao = {}
+    for coluna_original in df.columns:
+        chave = coluna_original.strip().lower()
+        if chave in COLUNAS_CANONICAS:
+            mapa_renomeacao[coluna_original] = COLUNAS_CANONICAS[chave]
+
+    return df.rename(columns=mapa_renomeacao)
+
+
 def validar_planilha(df: pd.DataFrame) -> None:
     """
-    Valida estrutura e conteúdo da planilha.
-    Cada Sold deve aparecer EXATAMENTE UMA VEZ no arquivo — a planilha
-    representa o estado atual de cada cliente, não um histórico de mudanças.
-    Lança ErroValidacaoPlanilha se algo estiver fora do padrão.
+    Valida estrutura e conteúdo da planilha (já com colunas normalizadas).
+    Cada Sold deve aparecer EXATAMENTE UMA VEZ no arquivo.
     """
     colunas_encontradas = set(df.columns)
 
@@ -37,7 +69,6 @@ def validar_planilha(df: pd.DataFrame) -> None:
     if df["Sold"].isnull().any():
         raise ErroValidacaoPlanilha("Existem linhas com o campo 'Sold' vazio.")
 
-    # --- Cada Sold só pode aparecer uma única vez na planilha ---
     solds_normalizados = df["Sold"].astype(str).str.strip()
     contagem_por_sold = solds_normalizados.value_counts()
     solds_duplicados = contagem_por_sold[contagem_por_sold > 1]
@@ -52,7 +83,6 @@ def validar_planilha(df: pd.DataFrame) -> None:
             f"Solds duplicados: {detalhes}. "
         )
 
-    # --- Verifica valores de "Dados Bancários", com normalização ---
     valores_normalizados = df["Dados Bancários"].dropna().apply(normalizar_dados_bancarios)
     valores_invalidos_mask = valores_normalizados.isna()
 
@@ -61,18 +91,20 @@ def validar_planilha(df: pd.DataFrame) -> None:
         raise ErroValidacaoPlanilha(
             f"A coluna 'Dados Bancários' contém valor(es) não permitido(s): "
             f"{', '.join(str(v) for v in valores_originais_invalidos)}. "
-            f"Valores aceitos: {', '.join(sorted(VALORES_PERMITIDOS))}."
+            f"Valores aceitos (em qualquer um dos formatos reconhecidos): "
+            f"{', '.join(sorted(VALORES_PERMITIDOS))}."
         )
+
 
 def importar_planilha(caminho_arquivo: str, db: Session, usuario: str = "sistema") -> dict:
     """
-    Lê o arquivo XLSX, valida seu conteúdo e realiza o upsert
-    (atualiza se o Sold já existe no banco, insere se é novo).
-    Cada Sold deve aparecer uma única vez na planilha.
+    Lê o arquivo XLSX, valida seu conteúdo e realiza o upsert.
+    Grava tanto a categoria (para o dashboard) quanto o texto original
+    da planilha (para exibição fiel na tela de consulta).
     """
     df = pd.read_excel(caminho_arquivo, dtype={"Sold": str})
-    print("COLUNAS ENCONTRADAS:", list(df.columns))  # linha temporária de debug
     df.columns = df.columns.str.strip()
+    df = normalizar_colunas(df)
 
     validar_planilha(df)
 
@@ -82,7 +114,10 @@ def importar_planilha(caminho_arquivo: str, db: Session, usuario: str = "sistema
     for _, linha in df.iterrows():
         sold = str(linha["Sold"]).strip()
         nome = str(linha["Nome"]).strip()
-        dados_bancarios = normalizar_dados_bancarios(linha["Dados Bancários"])
+
+        valor_bruto = linha["Dados Bancários"]
+        categoria = normalizar_dados_bancarios(valor_bruto)
+        descricao_original = str(valor_bruto).strip()
 
         cliente_existente = db.query(ClienteConta).filter(
             ClienteConta.sold == sold
@@ -90,14 +125,16 @@ def importar_planilha(caminho_arquivo: str, db: Session, usuario: str = "sistema
 
         if cliente_existente:
             cliente_existente.nome_cliente = nome
-            cliente_existente.dados_bancarios = dados_bancarios
+            cliente_existente.dados_bancarios = categoria
+            cliente_existente.dados_bancarios_descricao = descricao_original
             cliente_existente.atualizado_por = usuario
             total_atualizados += 1
         else:
             novo_cliente = ClienteConta(
                 sold=sold,
                 nome_cliente=nome,
-                dados_bancarios=dados_bancarios,
+                dados_bancarios=categoria,
+                dados_bancarios_descricao=descricao_original,
                 atualizado_por=usuario,
             )
             db.add(novo_cliente)

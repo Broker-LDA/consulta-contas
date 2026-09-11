@@ -613,7 +613,7 @@
                     <tr>
                         <td class="col-sold" data-label="Sold">${c.sold}</td>
                         <td class="col-nome" data-label="Nome">${c.nome_cliente}</td>
-                        <td class="col-dados" data-label="Dados Bancários">${c.dados_bancarios}</td>
+                        <td class="col-dados" data-label="Dados Bancários">${c.dados_bancarios_descricao || c.dados_bancarios}</td>
                     </tr>
                 `).join('');
 

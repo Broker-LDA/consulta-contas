@@ -7,6 +7,7 @@ class ClienteContaResponse(BaseModel):
     sold: str
     nome_cliente: str
     dados_bancarios: str
+    dados_bancarios_descricao: Optional[str] = None
     atualizado_em: Optional[datetime] = None
 
     class Config:

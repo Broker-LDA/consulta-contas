@@ -9,7 +9,16 @@ class ClienteConta(Base):
     id = Column(Integer, primary_key=True, index=True)
     sold = Column(String(20), unique=True, nullable=False, index=True)
     nome_cliente = Column(String(255), nullable=False)
+
+    # Categoria interna, usada pelo gráfico do dashboard.
+    # Continua restrita aos 4 valores fixos pela CheckConstraint abaixo.
     dados_bancarios = Column(String(30), nullable=False)
+
+    # Texto original da planilha, exibido na tela de consulta.
+    # Nullable=True para não quebrar registros já existentes no banco,
+    # que ainda não têm essa informação.
+    dados_bancarios_descricao = Column(String(60), nullable=True)
+
     atualizado_em = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     atualizado_por = Column(String(100), nullable=True)
 
